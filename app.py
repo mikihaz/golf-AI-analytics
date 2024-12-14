@@ -92,14 +92,18 @@ def main():
                     if not st.session_state.analysis_result.startswith('Error'):
                         try:
                             with st.spinner('Generating presentation...'):
-                                ppt_path = create_presentation(st.session_state.analysis_result)
-                                with open(ppt_path, "rb") as ppt:
-                                    st.download_button(
-                                        label="📥 Download Analysis PPT",
-                                        data=ppt,
-                                        file_name=f"{selected_player}_analysis.pptx",
-                                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                                    )
+                                ppt_path = create_presentation(str(st.session_state.analysis_result))
+                                if os.path.exists(ppt_path):
+                                    with open(ppt_path, "rb") as ppt:
+                                        ppt_data = ppt.read()
+                                        st.download_button(
+                                            label="📥 Download Analysis PPT",
+                                            data=ppt_data,
+                                            file_name=f"{selected_player}_analysis.pptx",
+                                            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                                        )
+                                    # Clean up temporary file
+                                    os.unlink(ppt_path)
                         except Exception as e:
                             st.error(f"Error generating presentation: {str(e)}")
                 

@@ -14,21 +14,21 @@ def extract_metrics(text):
         'percentages': []
     }
     
-    # Extract percentages
-    percentage_matches = re.findall(r'(\d+(?:\.\d+)?)\s*%\s*(?:of|in|for)?\s*([^,.]*)', text)
-    for value, label in percentage_matches:
-        metrics['values'].append(float(value))
-        metrics['labels'].append(label.strip() or f"Metric {len(metrics['labels'])+1}")
-        metrics['percentages'].append(True)
-    
-    # Extract other numerical values
-    number_matches = re.findall(r'([A-Za-z\s]+):\s*(\d+(?:\.\d+)?)', text)
-    for label, value in number_matches:
-        metrics['values'].append(float(value))
-        metrics['labels'].append(label.strip())
-        metrics['percentages'].append(False)
-    
-    return metrics
+    try:
+        # Extract metrics with format "MetricName: Value"
+        metric_matches = re.findall(r'([^:\n]+):\s*(\d+(?:\.\d+)?)', text)
+        for label, value in metric_matches:
+            if '%' in label or '%' in value:
+                metrics['percentages'].append(True)
+            else:
+                metrics['percentages'].append(False)
+            metrics['values'].append(float(value.strip('%')))
+            metrics['labels'].append(label.strip())
+        
+        return metrics
+    except Exception as e:
+        print(f"Error extracting metrics: {str(e)}")
+        return {'values': [], 'labels': [], 'percentages': []}
 
 def add_chart_slide(prs, metrics, chart_type=XL_CHART_TYPE.COLUMN_CLUSTERED):
     """Add a slide with the specified chart type."""
@@ -49,38 +49,52 @@ def add_chart_slide(prs, metrics, chart_type=XL_CHART_TYPE.COLUMN_CLUSTERED):
 
 def create_presentation(analysis):
     """Create presentation with standard formatting"""
-    prs = Presentation()
-    
-    # Title slide
-    _add_title_slide(prs)
-    
-    # Executive Summary
-    _add_summary_slide(prs, analysis)
-    
-    # Key Metrics Dashboard
-    metrics = extract_metrics(analysis)
-    if metrics['values']:
-        _add_metrics_dashboard(prs, metrics)
-    
-    # Detailed Analysis Slides
-    sections = _structure_content(analysis)
-    for section in sections:
-        if 'performance' in section.lower() or 'analysis' in section.lower():
-            _add_analysis_slide(prs, section)
-    
-    # Trend Analysis
-    _add_trend_analysis(prs, analysis, metrics)
-    
-    # Segment Analysis
-    _add_segment_analysis(prs, analysis)
-    
-    # Recommendations
-    _add_recommendations_slide(prs, analysis)
-    
-    # Save presentation
-    temp_ppt = tempfile.NamedTemporaryFile(delete=False, suffix='.pptx')
-    prs.save(temp_ppt.name)
-    return temp_ppt.name
+    try:
+        prs = Presentation()
+        
+        # Title slide
+        slide = prs.slides.add_slide(prs.slide_layouts[0])
+        title = slide.shapes.title
+        subtitle = slide.placeholders[1] if len(slide.placeholders) > 1 else None
+        
+        title.text = "Player Performance Analysis"
+        if subtitle:
+            subtitle.text = "AI-Generated Analysis Report"
+        
+        # Analysis sections
+        sections = analysis.split('\n\n')
+        for section in sections:
+            if section.strip():
+                # Create content slide for each major section
+                slide = prs.slides.add_slide(prs.slide_layouts[1])
+                
+                # Extract section title and content
+                lines = section.strip().split('\n')
+                if lines:
+                    title = slide.shapes.title
+                    title.text = lines[0].strip()
+                    
+                    if len(lines) > 1:
+                        body_shape = slide.shapes.placeholders[1]
+                        tf = body_shape.text_frame
+                        
+                        for line in lines[1:]:
+                            p = tf.add_paragraph()
+                            p.text = line.strip()
+                            p.level = 1 if line.startswith('-') else 0
+        
+        # Extract and add metrics charts
+        metrics = extract_metrics(analysis)
+        if metrics['values']:
+            _add_metrics_dashboard(prs, metrics)
+        
+        # Save presentation
+        temp_ppt = tempfile.NamedTemporaryFile(delete=False, suffix='.pptx')
+        prs.save(temp_ppt.name)
+        return temp_ppt.name
+        
+    except Exception as e:
+        raise Exception(f"Error creating presentation: {str(e)}")
 
 def _structure_content(analysis):
     """Better structure the content for presentation"""
@@ -138,7 +152,7 @@ def _apply_template_style(shape, style):
                 font.bold = style.get('bold', True)
 
 def _add_summary_slide(prs, analysis):
-    """Add summary slide matching template style"""
+    """Add summary slide with basic styling"""
     slide = prs.slides.add_slide(prs.slide_layouts[1])
     title = slide.shapes.title
     title.text = "Executive Summary"
@@ -150,12 +164,9 @@ def _add_summary_slide(prs, analysis):
         tf = body_shape.text_frame
         tf.text = summary.group(1).strip()
         
-        # Apply template bullet patterns if available
-        if template_data and 'structure' in template_data:
-            bullet_patterns = template_data['structure'].get('bullet_patterns', [])
-            if bullet_patterns:
-                for paragraph in tf.paragraphs[1:]:
-                    paragraph.level = 1
+        # Apply basic bullet points
+        for paragraph in tf.paragraphs[1:]:
+            paragraph.level = 1
 
 def _add_chart_slides(prs, metrics):
     """Add chart slides based on metrics and template preferences."""
@@ -176,28 +187,33 @@ def _add_chart_slides(prs, metrics):
         add_chart_slide(prs, percentage_metrics, XL_CHART_TYPE.PIE)
 
 def _add_metrics_dashboard(prs, metrics):
-    """Add a dashboard-style slide with multiple charts"""
-    slide = prs.slides.add_slide(prs.slide_layouts[2])
-    title = slide.shapes.title
-    title.text = "Key Performance Metrics"
-    
-    # Split metrics for different charts
-    perf_metrics = {k: v for k, v in zip(metrics['labels'], metrics['values']) 
-                   if 'performance' in k.lower() or 'growth' in k.lower()}
-    
-    # Add multiple small charts
-    if perf_metrics:
-        _add_small_chart(slide, perf_metrics, XL_CHART_TYPE.COLUMN_CLUSTERED, 
-                        Inches(0.5), Inches(1.5), Inches(4.5), Inches(3.5))
-    
-    # Add pie chart for percentages
-    percentage_metrics = {
-        'values': [v for v, p in zip(metrics['values'], metrics['percentages']) if p],
-        'labels': [l for l, p in zip(metrics['labels'], metrics['percentages']) if p]
-    }
-    if percentage_metrics['values']:
-        _add_small_chart(slide, percentage_metrics, XL_CHART_TYPE.PIE,
-                        Inches(5.5), Inches(1.5), Inches(4.5), Inches(3.5))
+    """Add a dashboard-style slide with charts"""
+    if not metrics['values']:
+        return
+        
+    try:
+        slide = prs.slides.add_slide(prs.slide_layouts[5])  # Using blank layout
+        title = slide.shapes.title
+        title.text = "Performance Metrics"
+        
+        # Create chart
+        chart_data = CategoryChartData()
+        chart_data.categories = metrics['labels']
+        chart_data.add_series('Values', metrics['values'])
+        
+        # Add chart to slide
+        x, y, cx, cy = Inches(1), Inches(1.5), Inches(8), Inches(5.5)
+        chart = slide.shapes.add_chart(
+            XL_CHART_TYPE.COLUMN_CLUSTERED, x, y, cx, cy, chart_data
+        ).chart
+        
+        # Customize chart
+        chart.has_legend = True
+        chart.has_title = True
+        chart.chart_title.text_frame.text = "Performance Metrics Overview"
+        
+    except Exception as e:
+        print(f"Error adding metrics dashboard: {str(e)}")
 
 def _add_trend_analysis(prs, analysis, metrics):
     """Add trend analysis with line charts"""
@@ -251,7 +267,7 @@ def _add_title_slide(prs):
         subtitle.text = "AI-Powered Analysis"
 
 def _add_analysis_slide(prs, section):
-    """Add analysis slide matching reference template format"""
+    """Add analysis slide with basic formatting"""
     slide = prs.slides.add_slide(prs.slide_layouts[2])  # Using two-content layout
     
     # Extract section title and content
@@ -291,13 +307,6 @@ def _add_analysis_slide(prs, section):
                 p = tf.add_paragraph()
                 p.text = f"• {point}"
                 p.level = 1
-
-    # Apply template styling
-    if template_data and 'styles' in template_data:
-        content_style = template_data['styles'].get('body', {})
-        for shape in slide.shapes:
-            if hasattr(shape, "text_frame"):
-                _apply_template_style(shape, content_style)
 
 def _add_segment_analysis(prs, analysis):
     """Add segment analysis slide"""
