@@ -114,31 +114,31 @@ def analyze_reference_ppt(file_path):
 def analyze_chunk(client, chunk, template_info=None):
     """Analyze content with reference to template structure."""
     try:
-        system_prompt = """You are a professional business analyst. Provide a comprehensive analysis with the following structure:
+        system_prompt = """You are a professional business analyst. Provide a comprehensive analysis with the following structure, ensuring all numerical data is clearly formatted:
 
-1. Executive Summary (with key highlights)
-2. Detailed Analysis:
-   - Key Performance Metrics (with specific numbers and percentages)
-   - Growth Trends (provide % changes)
-   - Performance Comparisons (with numerical data)
-   - Risk Areas (quantified if possible)
-3. Segment Analysis:
-   - Break down performance by different categories
-   - Market share percentages
-   - Year-over-year comparisons
-4. Recommendations:
-   - Actionable insights with expected impact (in %)
-   - Priority areas (with scoring 1-10)
-   - Growth opportunities (with potential % gains)
+1. Executive Summary
+2. Key Metrics (each on new line, strictly in format "MetricName: Number" or "Category: XX%"):
+   - Revenue: 1234567
+   - Growth Rate: 25%
+   - Market Share: 45%
+   - Customer Count: 5000
+3. Trend Analysis (each on new line, in format "Trend: Number"):
+   - Q1 Growth Trend: 15
+   - Q2 Growth Trend: 25
+   - Q3 Growth Trend: 35
+4. Segment Analysis (each on new line, in format "Segment: Number"):
+   - Enterprise Segment: 45
+   - SMB Segment: 30
+   - Consumer Segment: 25
+5. Performance Metrics (each on new line, in format "Metric: Number"):
+   - Sales Performance: 85
+   - Customer Satisfaction: 92
+   - Market Penetration: 78
+6. Recommendations (each with impact percentage):
+   - Recommendation 1 (Impact: 30%)
+   - Recommendation 2 (Impact: 25%)
 
-Format all numerical data clearly as "Category: Number" or "Metric: XX%" for easy extraction.
-Include at least 8-10 different metrics and percentages."""
-
-        if template_info:
-            metrics = ', '.join(template_info['metrics'])
-            charts = ', '.join(template_info['charts'])
-            system_prompt += f"\n\nFocus on these metrics: {metrics}"
-            system_prompt += f"\nFormat data suitable for these chart types: {charts}"
+Ensure EVERY numerical value is presented in the exact format specified above for proper chart generation."""
 
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -146,8 +146,8 @@ Include at least 8-10 different metrics and percentages."""
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": chunk}
             ],
-            temperature=0.7,  # Add some creativity while maintaining accuracy
-            max_tokens=2000   # Allow for longer, more detailed responses
+            temperature=0.7,
+            max_tokens=2000
         )
         return response.choices[0].message.content
     except OpenAIError as e:

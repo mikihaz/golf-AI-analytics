@@ -4,3 +4,4 @@ config.py
 __pycache__/
 .DS_Store
 template_patterns.json
+mac_venv/
