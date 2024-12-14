@@ -4,3 +4,4 @@ python-pptx
 openai>=1.0.0
 python-docx
 tiktoken
+python-dotenv
