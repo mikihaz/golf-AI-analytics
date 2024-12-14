@@ -1,127 +1,70 @@
 # Golf Player Performance Analyzer 🏌️‍♂️
 
-An AI-powered analytics tool that provides detailed performance analysis for golf players using OpenAI's GPT model. This application analyzes player statistics and generates comprehensive performance reports with visualizations.
+An AI-powered analytics tool providing detailed golf performance analysis using OpenAI's GPT model.
 
 ## Features 🌟
-
-- **Data Analysis**: Process and analyze player statistics from Excel/CSV files
-- **AI-Powered Insights**: Leverage OpenAI's GPT model for deep performance analysis
-- **Performance Comparisons**: Compare individual stats against team averages
-- **Visual Analytics**: Generate insightful charts and graphs
-- **Export Capabilities**: Download analysis as PowerPoint presentations
-- **User-Friendly Interface**: Built with Streamlit for easy interaction
+- Data Analysis from Excel/CSV files
+- AI-Powered Insights via OpenAI GPT
+- Performance Comparisons
+- Visual Analytics & Charts
+- Export to PowerPoint
+- Streamlit Interface
 
 ## Installation 🛠️
 
-1. Clone the repository:
 ```bash
+# Clone repository
 git clone https://github.com/yourusername/golf-AI-analytics.git
 cd golf-AI-analytics
-```
 
-2. Set up virtual environment:
-```bash
+# Setup environment
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-```
 
-3. Install dependencies:
-```bash
+# Install dependencies
 pip install -r requirements.txt
-```
 
-4. Configure API key:
-```bash
+# Configure API
 export OPENAI_API_KEY=your_api_key_here
 ```
 
 ## Usage 📊
-
-1. Start the application:
-```bash
-streamlit run app.py
-```
-
-2. Upload your golf statistics file (Excel/CSV)
+1. Run: `streamlit run app.py`
+2. Upload stats file (Excel/CSV)
 3. Select analysis options
-4. View results and download reports
+4. View/download results
 
 ## Requirements 📋
-
 - Python 3.8+
 - OpenAI API key
-- Required packages listed in `requirements.txt`
+- Packages in `requirements.txt`
 
-📊 Data Format
-Your Excel/CSV file should contain:
+## Data Format 📈
+- Player names column
+- Numeric statistics columns
+- One row per player
 
-Player names column (header should include "player" or "name")
-Numeric statistics columns
-One row per player
-Example format:
+## Analysis Features 🎯
+- Performance Summary
+- Comparative Analysis
+- Detailed Metrics
+- Custom Recommendations
 
-📈 Analysis Components
-Overall Performance Summary
+## Security 🔒
+- Local API key storage
+- No persistent data
+- In-memory analysis
 
-Ranking among all players
-Key performance indicators
-Statistical highlights
-Comparative Analysis
+## Contributing 🤝
+1. Fork repository
+2. Create feature branch
+3. Submit pull request
 
-Performance vs. team average
-Percentile rankings
-Strength/weakness identification
-Detailed Metrics
-
-Technical statistics
-Performance trends
-Key improvement areas
-Recommendations
-
-Specific improvement suggestions
-Practice focus areas
-Development strategies
-🛠 Technical Requirements
-Python 3.7+
-OpenAI API key
-Streamlit
-pandas
-python-pptx
-Other dependencies in requirements.txt
-🔒 Security
-API keys are stored locally in .env
-No data is permanently stored
-All analysis is performed in-memory
-🤝 Contributing
-Fork the repository
-Create your feature branch
-Commit your changes
-Push to the branch
-Create a Pull Request
-📝 License
-This project is licensed under the MIT License.
-
-🙏 Acknowledgments
-OpenAI for GPT API
-Streamlit team
-Python-PPTX developers
-💬 Support
-For support:
-
-Open an issue
-Contact repository maintainers
-Check documentation
-📊 Example Analysis
-The tool provides:
-
-Performance metrics analysis
-Statistical comparisons
-Visual representations
-Actionable insights
-Downloadable reports
-⚠️ Disclaimer
-This tool provides analytical insights based on available data. Golf performance involves many factors, and this analysis should be used as one of many development tools. `
+## Support 💬
+- Open issues
+- Contact maintainers
+- Check documentation
 
 ## License 📝
+MIT License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
