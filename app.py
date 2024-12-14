@@ -11,33 +11,20 @@ def main():
         # Basic page config
         st.set_page_config(page_title="AI Document Analyzer", layout="wide")
         
-        # Remove API key from session state
+        # Initialize session state
         if 'processed_file' not in st.session_state:
             st.session_state.processed_file = None
         if 'analysis_result' not in st.session_state:
             st.session_state.analysis_result = None
 
-        # Remove API Key input section from sidebar
+        # Settings sidebar
         st.sidebar.title("⚙️ Settings")
-
-        # Add reference PPT upload section
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("### Reference Template")
-        reference_ppt = st.sidebar.file_uploader(
-            "Upload a reference PPTX file",
-            type=['pptx'],
-            key='reference_ppt'
-        )
-
-        if reference_ppt:
-            st.session_state.reference_template = reference_ppt
-            st.sidebar.success("✅ Reference template loaded")
         
         # Main interface
         st.title("📄 AI Document Analyzer")
         st.markdown("### Upload your CV or Excel file for AI analysis")
 
-        # File uploader with clear instructions
+        # File uploader
         uploaded_file = st.file_uploader(
             "Supported formats: XLSX, CSV, DOCX, PDF",
             type=['xlsx', 'csv', 'docx', 'pdf'],
@@ -51,29 +38,20 @@ def main():
             if uploaded_file != st.session_state.processed_file:
                 st.session_state.processed_file = uploaded_file
                 
-                # Process file with reference template if available
+                # Process file
                 with st.spinner('📊 Analyzing document...'):
                     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
                         tmp_file.write(uploaded_file.getvalue())
                         file_path = tmp_file.name
                         
                         try:
-                            # Save reference template if available
-                            reference_path = None
-                            if 'reference_template' in st.session_state:
-                                with tempfile.NamedTemporaryFile(delete=False, suffix='.pptx') as ref_file:
-                                    ref_file.write(st.session_state.reference_template.getvalue())
-                                    reference_path = ref_file.name
-
-                            # Call process_document without API key
-                            analysis_result = process_document(file_path, reference_path)
+                            # Process document without reference template
+                            analysis_result = process_document(file_path)
                             st.session_state.analysis_result = analysis_result
                         except Exception as e:
                             st.error(f"Error processing document: {str(e)}")
                         finally:
                             os.unlink(file_path)
-                            if reference_path:
-                                os.unlink(reference_path)
 
             # Display results
             if st.session_state.analysis_result:

@@ -5,7 +5,6 @@ import os
 from openai import OpenAIError
 import tiktoken
 from pptx import Presentation
-from template_analyzer import TemplateAnalyzer
 from config import OPENAI_API_KEY
 
 def validate_api_key(api_key):
@@ -71,46 +70,6 @@ def chunk_content(text, max_tokens=14000):
     
     return chunks
 
-def analyze_reference_ppt(file_path):
-    """Extract structure and formatting from reference PPT."""
-    prs = Presentation(file_path)
-    template_info = {
-        'slides': [],
-        'charts': [],
-        'metrics': set()
-    }
-    
-    for slide in prs.slides:
-        slide_info = {'type': 'content', 'elements': []}
-        
-        for shape in slide.shapes:
-            if hasattr(shape, "chart"):
-                slide_info['type'] = 'chart'
-                chart_type = str(shape.chart.chart_type)
-                chart_data = {
-                    'type': chart_type,
-                    'has_legend': shape.chart.has_legend,
-                    'categories': []
-                }
-                template_info['charts'].append(chart_type)
-                
-            if hasattr(shape, "text"):
-                # Extract potential metric keywords
-                text = shape.text.lower()
-                for keyword in ['performance', 'metrics', 'kpi', 'growth', 'rate', 
-                              'revenue', 'sales', 'profit', 'percentage']:
-                    if keyword in text:
-                        template_info['metrics'].add(keyword)
-                
-                slide_info['elements'].append({
-                    'type': 'text',
-                    'content': shape.text
-                })
-        
-        template_info['slides'].append(slide_info)
-    
-    return template_info
-
 def analyze_chunk(client, chunk, template_info=None):
     """Analyze content with reference to template structure."""
     try:
@@ -153,31 +112,12 @@ Ensure EVERY numerical value is presented in the exact format specified above fo
     except OpenAIError as e:
         return f"Error analyzing chunk: {str(e)}"
 
-def process_document(file_path, reference_path=None):
+def process_document(file_path):
     try:
-        # Initialize template analyzer
-        template_analyzer = TemplateAnalyzer()
-        
         # Use static API key
         is_valid, client = validate_api_key(OPENAI_API_KEY)
         if not is_valid:
             return "Error: Invalid OpenAI API key. Please check the configuration."
-
-        # Analyze reference template if provided
-        template_data = None
-        if reference_path:
-            print("Learning from reference template...")
-            template_data = template_analyzer.learn_from_template(reference_path)
-            
-            # Save patterns for future use
-            patterns_file = "template_patterns.json"
-            template_analyzer.save_patterns(patterns_file)
-
-        # Analyze reference template if provided
-        template_info = None
-        if reference_path:
-            print("Analyzing reference template...")
-            template_info = analyze_reference_ppt(reference_path)
 
         # Debug information
         file_extension = os.path.splitext(file_path)[1].lower()
@@ -204,28 +144,14 @@ def process_document(file_path, reference_path=None):
             print(f"Unsupported file format: {file_extension}")
             return f"Unsupported file format: {file_extension}"
 
-        # Process content in chunks with template info
+        # Process content in chunks
         chunks = chunk_content(content)
         print(f"Content split into {len(chunks)} chunks")
-        
-        def analyze_with_template(client, chunk):
-            """Analyze content using template-based prompt"""
-            system_prompt = template_analyzer.generate_prompt(template_data) if template_data else \
-                          "Analyze the content and provide structured insights with numerical data."
-            
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": chunk}
-                ]
-            )
-            return response.choices[0].message.content
 
         all_analyses = []
         for i, chunk in enumerate(chunks, 1):
             print(f"Processing chunk {i} of {len(chunks)}...")
-            chunk_analysis = analyze_with_template(client, chunk)
+            chunk_analysis = analyze_chunk(client, chunk)
             all_analyses.append(chunk_analysis)
 
         # Combine all analyses

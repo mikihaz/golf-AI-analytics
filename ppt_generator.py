@@ -47,35 +47,35 @@ def add_chart_slide(prs, metrics, chart_type=XL_CHART_TYPE.COLUMN_CLUSTERED):
     chart.has_title = True
     chart.chart_title.text_frame.text = "Performance Metrics"
 
-def create_presentation(analysis, template_data=None):
-    """Create presentation with enhanced analytics"""
+def create_presentation(analysis):
+    """Create presentation with standard formatting"""
     prs = Presentation()
     
     # Title slide
-    _add_title_slide(prs, template_data)
+    _add_title_slide(prs)
     
     # Executive Summary
-    _add_summary_slide(prs, analysis, template_data)
+    _add_summary_slide(prs, analysis)
     
     # Key Metrics Dashboard
     metrics = extract_metrics(analysis)
     if metrics['values']:
-        _add_metrics_dashboard(prs, metrics, template_data)
+        _add_metrics_dashboard(prs, metrics)
     
     # Detailed Analysis Slides
     sections = _structure_content(analysis)
     for section in sections:
         if 'performance' in section.lower() or 'analysis' in section.lower():
-            _add_analysis_slide(prs, section, template_data)
+            _add_analysis_slide(prs, section)
     
     # Trend Analysis
-    _add_trend_analysis(prs, analysis, metrics, template_data)
+    _add_trend_analysis(prs, analysis, metrics)
     
     # Segment Analysis
-    _add_segment_analysis(prs, analysis, template_data)
+    _add_segment_analysis(prs, analysis)
     
     # Recommendations
-    _add_recommendations_slide(prs, analysis, template_data)
+    _add_recommendations_slide(prs, analysis)
     
     # Save presentation
     temp_ppt = tempfile.NamedTemporaryFile(delete=False, suffix='.pptx')
@@ -137,7 +137,7 @@ def _apply_template_style(shape, style):
                 font.size = style.get('size', Pt(32))
                 font.bold = style.get('bold', True)
 
-def _add_summary_slide(prs, analysis, template_data):
+def _add_summary_slide(prs, analysis):
     """Add summary slide matching template style"""
     slide = prs.slides.add_slide(prs.slide_layouts[1])
     title = slide.shapes.title
@@ -157,7 +157,7 @@ def _add_summary_slide(prs, analysis, template_data):
                 for paragraph in tf.paragraphs[1:]:
                     paragraph.level = 1
 
-def _add_chart_slides(prs, metrics, template_data=None):
+def _add_chart_slides(prs, metrics):
     """Add chart slides based on metrics and template preferences."""
     if not metrics['values']:
         return
@@ -175,7 +175,7 @@ def _add_chart_slides(prs, metrics, template_data=None):
     if percentage_metrics['values']:
         add_chart_slide(prs, percentage_metrics, XL_CHART_TYPE.PIE)
 
-def _add_metrics_dashboard(prs, metrics, template_data):
+def _add_metrics_dashboard(prs, metrics):
     """Add a dashboard-style slide with multiple charts"""
     slide = prs.slides.add_slide(prs.slide_layouts[2])
     title = slide.shapes.title
@@ -199,7 +199,7 @@ def _add_metrics_dashboard(prs, metrics, template_data):
         _add_small_chart(slide, percentage_metrics, XL_CHART_TYPE.PIE,
                         Inches(5.5), Inches(1.5), Inches(4.5), Inches(3.5))
 
-def _add_trend_analysis(prs, analysis, metrics, template_data):
+def _add_trend_analysis(prs, analysis, metrics):
     """Add trend analysis with line charts"""
     slide = prs.slides.add_slide(prs.slide_layouts[2])
     title = slide.shapes.title
@@ -224,7 +224,7 @@ def _add_small_chart(slide, data, chart_type, x, y, cx, cy):
     chart = slide.shapes.add_chart(chart_type, x, y, cx, cy, chart_data).chart
     chart.has_legend = True
 
-def _add_recommendations_slide(prs, analysis, template_data):
+def _add_recommendations_slide(prs, analysis):
     """Add recommendations with impact analysis"""
     slide = prs.slides.add_slide(prs.slide_layouts[1])
     title = slide.shapes.title
@@ -241,32 +241,16 @@ def _add_recommendations_slide(prs, analysis, template_data):
         p.text = f"• {rec.strip()} (Impact: {impact})"
         p.level = 0
 
-def _add_title_slide(prs, template_data=None):
-    """Create title slide matching reference template style"""
+def _add_title_slide(prs):
     slide = prs.slides.add_slide(prs.slide_layouts[0])
     title = slide.shapes.title
     subtitle = slide.placeholders[1] if len(slide.placeholders) > 1 else None
     
-    # Apply template styling if available
-    if template_data and 'styles' in template_data:
-        title_style = template_data['styles'].get('title', {})
-        _apply_template_style(title, title_style)
-        
-        # Apply background color if specified in template
-        if 'color_scheme' in template_data and template_data['color_scheme']:
-            try:
-                background = slide.background
-                fill = background.fill
-                fill.solid()
-                fill.fore_color.rgb = template_data['color_scheme'][0]
-            except:
-                pass
-
     title.text = "Document Analysis Report"
     if subtitle:
         subtitle.text = "AI-Powered Analysis"
 
-def _add_analysis_slide(prs, section, template_data):
+def _add_analysis_slide(prs, section):
     """Add analysis slide matching reference template format"""
     slide = prs.slides.add_slide(prs.slide_layouts[2])  # Using two-content layout
     
@@ -315,7 +299,7 @@ def _add_analysis_slide(prs, section, template_data):
             if hasattr(shape, "text_frame"):
                 _apply_template_style(shape, content_style)
 
-def _add_segment_analysis(prs, analysis, template_data):
+def _add_segment_analysis(prs, analysis):
     """Add segment analysis slide"""
     slide = prs.slides.add_slide(prs.slide_layouts[1])
     title = slide.shapes.title
