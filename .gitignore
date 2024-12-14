@@ -1,0 +1,6 @@
+config.py
+.env
+*.pyc
+__pycache__/
+.DS_Store
+template_patterns.json
