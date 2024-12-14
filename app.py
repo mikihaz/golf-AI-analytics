@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from document_processor import process_document
+from document_processor import process_document, validate_api_key, analyze_player_performance
 from ppt_generator import create_presentation
 import tempfile
 import os
@@ -9,81 +9,119 @@ from config import OPENAI_API_KEY
 def main():
     try:
         # Basic page config
-        st.set_page_config(page_title="AI Document Analyzer", layout="wide")
+        st.set_page_config(page_title="Golf Player Analyzer", layout="wide")
         
         # Initialize session state
-        if 'processed_file' not in st.session_state:
-            st.session_state.processed_file = None
+        if 'data_df' not in st.session_state:
+            st.session_state.data_df = None
         if 'analysis_result' not in st.session_state:
             st.session_state.analysis_result = None
+        if 'players_list' not in st.session_state:
+            st.session_state.players_list = None
 
-        # Settings sidebar
-        st.sidebar.title("⚙️ Settings")
-        
         # Main interface
-        st.title("📄 AI Document Analyzer")
-        st.markdown("### Upload your CV or Excel file for AI analysis")
+        st.title("⛳ Golf Player Performance Analyzer")
+        st.markdown("### Upload player statistics file for AI analysis")
 
         # File uploader
         uploaded_file = st.file_uploader(
-            "Supported formats: XLSX, CSV, DOCX, PDF",
-            type=['xlsx', 'csv', 'docx', 'pdf'],
+            "Upload Excel/CSV file with player statistics",
+            type=['xlsx', 'csv'],
             key='file_uploader'
         )
         
         if uploaded_file is not None:
-            # Show file info
-            st.info(f"File uploaded: {uploaded_file.name}")
-            
-            if uploaded_file != st.session_state.processed_file:
-                st.session_state.processed_file = uploaded_file
-                
-                # Process file
-                with st.spinner('📊 Analyzing document...'):
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
-                        tmp_file.write(uploaded_file.getvalue())
-                        file_path = tmp_file.name
+            try:
+                # Load and store data in session state
+                if st.session_state.data_df is None:
+                    with st.spinner('Loading data...'):
+                        if uploaded_file.name.endswith('.xlsx'):
+                            df = pd.read_excel(uploaded_file)
+                        else:
+                            df = pd.read_csv(uploaded_file)
+                        st.session_state.data_df = df
                         
+                        # Get players list
                         try:
-                            # Process document without reference template
-                            analysis_result = process_document(file_path)
-                            st.session_state.analysis_result = analysis_result
-                        except Exception as e:
-                            st.error(f"Error processing document: {str(e)}")
-                        finally:
-                            os.unlink(file_path)
-
-            # Display results
-            if st.session_state.analysis_result:
-                st.subheader("🔍 Analysis Results")
-                st.write(st.session_state.analysis_result)
-
-                if ("Error" not in st.session_state.analysis_result and 
-                    "Unsupported" not in st.session_state.analysis_result):
-                    try:
-                        # Generate PPT
-                        with st.spinner('Generating presentation...'):
-                            ppt_path = create_presentation(st.session_state.analysis_result)
-                            
-                            # Provide download button
-                            with open(ppt_path, "rb") as ppt:
-                                st.download_button(
-                                    label="📥 Download Analysis PPT",
-                                    data=ppt,
-                                    file_name="analysis_report.pptx",
-                                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                            player_col = next(col for col in df.columns if 'player' in col.lower())
+                            st.session_state.players_list = sorted(df[player_col].unique().tolist())
+                        except StopIteration:
+                            st.error("Could not find player column in the data")
+                            return
+                
+                # Display data preview
+                st.subheader("Data Preview")
+                st.dataframe(st.session_state.data_df.head())
+                
+                # Player selection
+                if st.session_state.players_list:
+                    selected_player = st.selectbox(
+                        "Select a player to analyze:",
+                        options=st.session_state.players_list,
+                        key='player_selector'
+                    )
+                    
+                    col1, col2 = st.columns([1, 2])
+                    with col1:
+                        if st.button("Analyze Player", key='analyze_btn'):
+                            with st.spinner('Analyzing player performance...'):
+                                # Get API client
+                                is_valid, client = validate_api_key(OPENAI_API_KEY)
+                                if not is_valid:
+                                    st.error("Invalid API key")
+                                    return
+                                
+                                # Perform analysis
+                                analysis_result = analyze_player_performance(
+                                    client, 
+                                    st.session_state.data_df, 
+                                    selected_player
                                 )
-                    except Exception as e:
-                        st.error(f"Error generating presentation: {str(e)}")
+                                st.session_state.analysis_result = analysis_result
+                    
+                    with col2:
+                        if st.session_state.analysis_result:
+                            st.info("Analysis complete! See results below.")
+                
+                # Display results
+                if st.session_state.analysis_result:
+                    st.subheader("🔍 Analysis Results")
+                    st.write(st.session_state.analysis_result)
+                    
+                    # Generate and offer PPT download
+                    if not st.session_state.analysis_result.startswith('Error'):
+                        try:
+                            with st.spinner('Generating presentation...'):
+                                ppt_path = create_presentation(st.session_state.analysis_result)
+                                with open(ppt_path, "rb") as ppt:
+                                    st.download_button(
+                                        label="📥 Download Analysis PPT",
+                                        data=ppt,
+                                        file_name=f"{selected_player}_analysis.pptx",
+                                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                                    )
+                        except Exception as e:
+                            st.error(f"Error generating presentation: {str(e)}")
+                
+            except Exception as e:
+                st.error(f"Error processing file: {str(e)}")
+        
+        # Clear data button
+        if st.session_state.data_df is not None:
+            if st.sidebar.button("Clear Data"):
+                st.session_state.data_df = None
+                st.session_state.players_list = None
+                st.session_state.analysis_result = None
+                st.experimental_rerun()
 
         # Add footer
         st.markdown("---")
         st.markdown("### Instructions")
         st.markdown("""
-        1. Upload your document using the file uploader above
-        2. Wait for the AI analysis to complete
-        3. Review the analysis results
-        4. Download the PowerPoint presentation
+        1. Upload your Excel/CSV file containing player statistics
+        2. Select a player from the dropdown menu
+        3. Click "Analyze Player" to generate insights
+        4. Review the analysis and download the presentation
         """)
 
     except Exception as e:

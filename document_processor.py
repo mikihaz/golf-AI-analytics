@@ -6,6 +6,7 @@ from openai import OpenAIError
 import tiktoken
 from pptx import Presentation
 from config import OPENAI_API_KEY
+import json  # Add this import at the top with other imports
 
 def validate_api_key(api_key):
     try:
@@ -112,70 +113,156 @@ Ensure EVERY numerical value is presented in the exact format specified above fo
     except OpenAIError as e:
         return f"Error analyzing chunk: {str(e)}"
 
-def process_document(file_path):
+def get_players_list(file_path):
+    """Extract list of players from the Excel/CSV file."""
     try:
-        # Use static API key
+        if file_path.endswith('.xlsx'):
+            df = pd.read_excel(file_path)
+        else:
+            df = pd.read_csv(file_path)
+        
+        # Assuming player names are in a column named 'Player' or similar
+        player_column = next(col for col in df.columns if 'player' in col.lower())
+        players = df[player_column].unique().tolist()
+        return players
+    except Exception as e:
+        print(f"Error getting players list: {str(e)}")
+        return []
+
+def get_player_column(df):
+    """Identify the player column name in the dataframe."""
+    possible_names = ['Player', 'player', 'Name', 'name', 'PLAYER', 'PlayerName', 'Player Name']
+    
+    for name in possible_names:
+        if name in df.columns:
+            return name
+            
+    # If no exact match, try partial matches
+    for col in df.columns:
+        if any(name.lower() in col.lower() for name in ['player', 'name']):
+            return col
+            
+    raise ValueError("Could not find player column in the data")
+
+def analyze_player_performance(client, df, selected_player):
+    """Analyze specific player's performance compared to others."""
+    try:
+        # Get the correct player column name
+        player_column = next(col for col in df.columns if 'player' in col.lower())
+        
+        # Verify player exists in the data
+        if selected_player not in df[player_column].values:
+            return f"Error: Player '{selected_player}' not found in the data"
+        
+        # Filter numeric columns only and remove columns with all NaN values
+        numeric_columns = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+        numeric_columns = [col for col in numeric_columns if not df[col].isna().all()]
+        
+        # Calculate player stats
+        player_data = df[df[player_column] == selected_player]
+        
+        # Handle NaN values in player stats
+        player_stats = {}
+        for col in numeric_columns:
+            val = player_data[col].iloc[0]
+            player_stats[col] = round(float(val), 2) if pd.notna(val) else None
+        
+        # Remove None/NaN values from stats
+        player_stats = {k: v for k, v in player_stats.items() if v is not None}
+        
+        # Calculate overall stats handling NaN values
+        all_players_stats = {
+            'mean': df[numeric_columns].mean().apply(lambda x: round(float(x), 2) if pd.notna(x) else None).to_dict(),
+            'max': df[numeric_columns].max().apply(lambda x: round(float(x), 2) if pd.notna(x) else None).to_dict(),
+            'min': df[numeric_columns].min().apply(lambda x: round(float(x), 2) if pd.notna(x) else None).to_dict()
+        }
+        
+        # Calculate rankings and percentiles only for non-NaN values
+        rankings = {}
+        percentiles = {}
+        for col in numeric_columns:
+            if pd.notna(player_data[col].iloc[0]):
+                # Filter out NaN values for ranking calculations
+                valid_data = df[df[col].notna()]
+                if not valid_data.empty:
+                    rankings[col] = int(valid_data[col].rank(ascending=False)[player_data.index[0]])
+                    percentiles[col] = int(100 * (len(valid_data[valid_data[col] <= player_data[col].iloc[0]]) / len(valid_data)))
+        
+        # Clean up stats dictionaries to remove any remaining None values
+        all_players_stats = {k: {k2: v2 for k2, v2 in v.items() if v2 is not None} 
+                           for k, v in all_players_stats.items()}
+        
+        # Create analysis prompt
+        analysis_prompt = f"""Analyze the following golf player statistics and provide a detailed comparison:
+
+Player: {selected_player}
+
+Player's Current Statistics:
+{json.dumps(player_stats, indent=2)}
+
+Rankings (out of {len(df)} players):
+{json.dumps(rankings, indent=2)}
+
+Percentile Rankings:
+{json.dumps(percentiles, indent=2)}
+
+Statistical Context:
+- Mean: {json.dumps(all_players_stats['mean'], indent=2)}
+- Best: {json.dumps(all_players_stats['max'], indent=2)}
+- Worst: {json.dumps(all_players_stats['min'], indent=2)}
+
+Provide a detailed analysis with the following structure:
+1. Overall Performance Summary
+2. Key Strengths (top 25% percentile metrics)
+3. Areas for Improvement (bottom 25% percentile metrics)
+4. Comparative Analysis with Average Players
+5. Statistical Highlights
+6. Specific Recommendations for Improvement
+
+Use exact numbers and percentages in your analysis.
+Format all metrics as "Metric Name: Value" for proper chart generation.
+Include percentile rankings in the analysis."""
+
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a professional golf analyst. Provide detailed insights comparing the player's performance with others."},
+                {"role": "user", "content": analysis_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2000
+        )
+        
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Error analyzing player performance: {str(e)}\nDataframe columns: {', '.join(df.columns.tolist())}"
+
+def process_document(file_path, selected_player=None):
+    try:
         is_valid, client = validate_api_key(OPENAI_API_KEY)
         if not is_valid:
             return "Error: Invalid OpenAI API key. Please check the configuration."
 
-        # Debug information
         file_extension = os.path.splitext(file_path)[1].lower()
-        print(f"Processing file with extension: {file_extension}")
         
         if file_extension in ['.xlsx', '.csv']:
             try:
                 if file_extension == '.xlsx':
-                    content = pd.read_excel(file_path, engine='openpyxl').to_string()
+                    df = pd.read_excel(file_path)
                 else:
-                    content = pd.read_csv(file_path).to_string()
-                print("Successfully read Excel/CSV file")
+                    df = pd.read_csv(file_path)
+                
+                if selected_player:
+                    # Perform player-specific analysis
+                    return analyze_player_performance(client, df, selected_player)
+                else:
+                    # Return list of players
+                    return get_players_list(file_path)
+                    
             except Exception as e:
-                print(f"Error reading Excel/CSV file: {str(e)}")
-                return f"Error processing file: {str(e)}"
-        elif file_extension == '.docx':
-            try:
-                content = read_docx(file_path)
-                print("Successfully read DOCX file")
-            except Exception as e:
-                print(f"Error reading DOCX file: {str(e)}")
                 return f"Error processing file: {str(e)}"
         else:
-            print(f"Unsupported file format: {file_extension}")
             return f"Unsupported file format: {file_extension}"
-
-        # Process content in chunks
-        chunks = chunk_content(content)
-        print(f"Content split into {len(chunks)} chunks")
-
-        all_analyses = []
-        for i, chunk in enumerate(chunks, 1):
-            print(f"Processing chunk {i} of {len(chunks)}...")
-            chunk_analysis = analyze_chunk(client, chunk)
-            all_analyses.append(chunk_analysis)
-
-        # Combine all analyses
-        if len(all_analyses) == 1:
-            return all_analyses[0]
-        
-        # If multiple chunks, summarize them
-        combined_analysis = "\n\n=== Combined Analysis ===\n\n"
-        for i, analysis in enumerate(all_analyses, 1):
-            combined_analysis += f"\nSection {i}:\n{analysis}\n"
             
-        # Generate final summary
-        try:
-            summary_response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "Summarize the following analyses into a concise, coherent summary:"},
-                    {"role": "user", "content": combined_analysis}
-                ]
-            )
-            return summary_response.choices[0].message.content
-        except OpenAIError as api_error:
-            return combined_analysis  # Fallback to combined analysis if summary fails
-                
     except Exception as e:
-        print(f"Error in process_document: {str(e)}")
         return f"Error processing document: {str(e)}"
