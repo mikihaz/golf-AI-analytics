@@ -21,7 +21,7 @@ def main():
 
         # Main interface
         st.title("⛳ Golf Player Performance Analyzer")
-        st.markdown("### Upload player statistics file for AI analysis")
+        st.markdown("### Upload player statistics file for analysis")
 
         # File uploader
         uploaded_file = st.file_uploader(

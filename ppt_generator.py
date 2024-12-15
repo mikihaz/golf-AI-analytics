@@ -59,7 +59,7 @@ def create_presentation(analysis):
         
         title.text = "Player Performance Analysis"
         if subtitle:
-            subtitle.text = "AI-Generated Analysis Report"
+            subtitle.text = "Performance Analysis Report"
         
         # Analysis sections
         sections = analysis.split('\n\n')
