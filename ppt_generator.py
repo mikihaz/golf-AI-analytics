@@ -88,6 +88,15 @@ def create_presentation(analysis):
         if metrics['values']:
             _add_metrics_dashboard(prs, metrics)
         
+        # Add hole analysis if available
+        hole_pattern = r'Hole \d+.*?player_score: (\d+\.?\d*)'
+        if re.search(hole_pattern, analysis):
+            _add_hole_analysis_slide(prs, metrics)
+            
+        # Add time analysis if available
+        if 'morning_avg' in metrics and 'afternoon_avg' in metrics:
+            _add_time_analysis_slide(prs, metrics)
+        
         # Save presentation
         temp_ppt = tempfile.NamedTemporaryFile(delete=False, suffix='.pptx')
         prs.save(temp_ppt.name)
@@ -320,3 +329,49 @@ def _add_segment_analysis(prs, analysis):
         segment_data = {label.strip(): float(value) for label, value in segments}
         _add_small_chart(slide, segment_data, XL_CHART_TYPE.BAR_CLUSTERED,
                         Inches(1), Inches(1.5), Inches(8), Inches(5))
+
+def _add_hole_analysis_slide(prs, hole_stats):
+    """Add hole-by-hole comparison chart"""
+    slide = prs.slides.add_slide(prs.slide_layouts[5])
+    title = slide.shapes.title
+    title.text = "Hole-by-Hole Performance"
+    
+    chart_data = CategoryChartData()
+    holes = sorted(hole_stats.keys())
+    chart_data.categories = holes
+    
+    # Add player scores
+    player_scores = [hole_stats[hole]['player_score'] for hole in holes]
+    field_averages = [hole_stats[hole]['field_average'] for hole in holes]
+    
+    chart_data.add_series('Player Score', player_scores)
+    chart_data.add_series('Field Average', field_averages)
+    
+    x, y, cx, cy = Inches(1), Inches(1.5), Inches(8), Inches(5)
+    chart = slide.shapes.add_chart(
+        XL_CHART_TYPE.LINE_MARKERS, x, y, cx, cy, chart_data
+    ).chart
+    
+    chart.has_legend = True
+    chart.has_title = True
+
+def _add_time_analysis_slide(prs, time_stats):
+    """Add time of day analysis chart"""
+    slide = prs.slides.add_slide(prs.slide_layouts[5])
+    title = slide.shapes.title
+    title.text = "Morning vs Afternoon Performance"
+    
+    chart_data = CategoryChartData()
+    chart_data.categories = ['Morning', 'Afternoon']
+    chart_data.add_series('Average Score', [
+        time_stats['morning_avg'],
+        time_stats['afternoon_avg']
+    ])
+    
+    x, y, cx, cy = Inches(1), Inches(1.5), Inches(8), Inches(5)
+    chart = slide.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED, x, y, cx, cy, chart_data
+    ).chart
+    
+    chart.has_legend = True
+    chart.has_title = True

@@ -148,80 +148,97 @@ def analyze_player_performance(client, df, selected_player):
     """Analyze specific player's performance compared to others."""
     try:
         # Get the correct player column name
-        player_column = next(col for col in df.columns if 'player' in col.lower())
+        player_column = 'Player_Name'  # Match your data structure
         
         # Verify player exists in the data
         if selected_player not in df[player_column].values:
             return f"Error: Player '{selected_player}' not found in the data"
         
-        # Filter numeric columns only and remove columns with all NaN values
-        numeric_columns = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
-        numeric_columns = [col for col in numeric_columns if not df[col].isna().all()]
-        
         # Calculate player stats
         player_data = df[df[player_column] == selected_player]
         
-        # Handle NaN values in player stats
-        player_stats = {}
-        for col in numeric_columns:
-            val = player_data[col].iloc[0]
-            player_stats[col] = round(float(val), 2) if pd.notna(val) else None
+        # Add hole-by-hole analysis
+        hole_columns = sorted([col for col in df.columns if col.startswith('H_') and col.endswith('_GS')])
+        hole_stats = {}
+        for hole in hole_columns:
+            hole_num = int(hole.split('_')[1])
+            player_score = player_data[hole].mean()
+            field_average = df[hole].mean()
+            hole_stats[f"Hole {hole_num}"] = {
+                'player_score': round(float(player_score), 2),
+                'field_average': round(float(field_average), 2),
+                'difference': round(float(player_score - field_average), 2)
+            }
         
-        # Remove None/NaN values from stats
-        player_stats = {k: v for k, v in player_stats.items() if v is not None}
+        # Add time of day analysis (modified to handle time strings)
+        try:
+            df['Hour'] = pd.to_datetime(df['Date'] + ' ' + df['Tee_Off']).dt.hour
+            morning_rounds = player_data[df['Hour'] < 12]
+            afternoon_rounds = player_data[df['Hour'] >= 12]
+            
+            time_analysis = {
+                'morning_avg': round(float(morning_rounds['Tot_par'].mean()), 2) if not morning_rounds.empty else 0,
+                'afternoon_avg': round(float(afternoon_rounds['Tot_par'].mean()), 2) if not afternoon_rounds.empty else 0,
+                'morning_rounds': len(morning_rounds),
+                'afternoon_rounds': len(afternoon_rounds)
+            }
+        except Exception as e:
+            # Fallback if time analysis fails
+            time_analysis = {
+                'morning_avg': 0,
+                'afternoon_avg': 0,
+                'morning_rounds': 0,
+                'afternoon_rounds': 0
+            }
         
-        # Calculate overall stats handling NaN values
-        all_players_stats = {
-            'mean': df[numeric_columns].mean().apply(lambda x: round(float(x), 2) if pd.notna(x) else None).to_dict(),
-            'max': df[numeric_columns].max().apply(lambda x: round(float(x), 2) if pd.notna(x) else None).to_dict(),
-            'min': df[numeric_columns].min().apply(lambda x: round(float(x), 2) if pd.notna(x) else None).to_dict()
+        # Add handicap comparison
+        player_handicap = float(player_data['Handicap'].iloc[0])
+        similar_handicaps = df[
+            (df['Handicap'] >= player_handicap - 2) & 
+            (df['Handicap'] <= player_handicap + 2) & 
+            (df['Player_Name'] != selected_player)
+        ]
+        
+        handicap_analysis = {
+            'player_avg': round(float(player_data['Tot_par'].mean()), 2),
+            'similar_handicap_avg': round(float(similar_handicaps['Tot_par'].mean()), 2),
+            'handicap_range': f"{player_handicap-2} to {player_handicap+2}",
+            'similar_players_count': len(similar_handicaps['Player_Name'].unique())
         }
-        
-        # Calculate rankings and percentiles only for non-NaN values
-        rankings = {}
-        percentiles = {}
-        for col in numeric_columns:
-            if pd.notna(player_data[col].iloc[0]):
-                # Filter out NaN values for ranking calculations
-                valid_data = df[df[col].notna()]
-                if not valid_data.empty:
-                    rankings[col] = int(valid_data[col].rank(ascending=False)[player_data.index[0]])
-                    percentiles[col] = int(100 * (len(valid_data[valid_data[col] <= player_data[col].iloc[0]]) / len(valid_data)))
-        
-        # Clean up stats dictionaries to remove any remaining None values
-        all_players_stats = {k: {k2: v2 for k2, v2 in v.items() if v2 is not None} 
-                           for k, v in all_players_stats.items()}
-        
-        # Create analysis prompt
+
+        # Update analysis prompt
         analysis_prompt = f"""Analyze the following golf player statistics and provide a detailed comparison:
 
 Player: {selected_player}
 
+Hole-by-Hole Analysis:
+{json.dumps(hole_stats, indent=2)}
+
+Handicap Comparison:
+{json.dumps(handicap_analysis, indent=2)}
+
 Player's Current Statistics:
-{json.dumps(player_stats, indent=2)}
+- Total Par: {player_data['Tot_par'].iloc[0]}
+- Handicap: {player_handicap}
 
-Rankings (out of {len(df)} players):
-{json.dumps(rankings, indent=2)}
-
-Percentile Rankings:
-{json.dumps(percentiles, indent=2)}
-
-Statistical Context:
-- Mean: {json.dumps(all_players_stats['mean'], indent=2)}
-- Best: {json.dumps(all_players_stats['max'], indent=2)}
-- Worst: {json.dumps(all_players_stats['min'], indent=2)}
+Hole Performance Metrics:
+{"".join(f"Hole {i}: {hole_stats[f'Hole {i}']['player_score']} (Field Avg: {hole_stats[f'Hole {i}']['field_average']})\n" for i in range(1, 19))}
 
 Provide a detailed analysis with the following structure:
 1. Overall Performance Summary
-2. Key Strengths (top 25% percentile metrics)
-3. Areas for Improvement (bottom 25% percentile metrics)
-4. Comparative Analysis with Average Players
-5. Statistical Highlights
-6. Specific Recommendations for Improvement
+2. Hole-by-Hole Performance:
+   - List each hole's average score compared to field average
+   - Identify strongest and weakest holes
+   - Highlight notable patterns
+3. Handicap Group Comparison:
+   - Compare performance against similar handicap players
+   - Identify areas where player outperforms or underperforms their handicap group
+4. Key Strengths
+5. Areas for Improvement
+6. Specific Recommendations
 
-Use exact numbers and percentages in your analysis.
-Format all metrics as "Metric Name: Value" for proper chart generation.
-Include percentile rankings in the analysis."""
+Format all numerical data as "Metric: Value" for proper chart generation.
+Include specific hole scores and handicap comparisons."""
 
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
