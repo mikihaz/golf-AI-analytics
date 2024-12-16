@@ -87,6 +87,20 @@ def create_presentation(analysis):
         metrics = extract_metrics(analysis)
         if metrics['values']:
             _add_metrics_dashboard(prs, metrics)
+            
+            # Add hole analysis charts
+            hole_pattern = r'Hole \d+:'
+            if re.search(hole_pattern, analysis):
+                hole_stats = {}
+                for match in re.finditer(r'Hole (\d+):\s*(\d+(?:\.\d+)?)\s*\(Handicap Group Avg:\s*(\d+(?:\.\d+)?),\s*Field Avg:\s*(\d+(?:\.\d+)?)\)', analysis):
+                    hole_num = int(match.group(1))
+                    hole_stats[f'Hole {hole_num}'] = {
+                        'player_score': float(match.group(2)),
+                        'handicap_group_avg': float(match.group(3)),
+                        'field_average': float(match.group(4))
+                    }
+                if hole_stats:
+                    _add_hole_analysis_slide(prs, hole_stats)
         
         # Add hole analysis if available
         hole_pattern = r'Hole \d+.*?player_score: (\d+\.?\d*)'
@@ -331,29 +345,60 @@ def _add_segment_analysis(prs, analysis):
                         Inches(1), Inches(1.5), Inches(8), Inches(5))
 
 def _add_hole_analysis_slide(prs, hole_stats):
-    """Add hole-by-hole comparison chart"""
-    slide = prs.slides.add_slide(prs.slide_layouts[5])
-    title = slide.shapes.title
+    """Add hole-by-hole comparison charts"""
+    # Create first slide for line chart comparison
+    slide1 = prs.slides.add_slide(prs.slide_layouts[5])
+    title = slide1.shapes.title
     title.text = "Hole-by-Hole Performance"
     
+    # Prepare data
+    holes = sorted([h for h in hole_stats.keys() if h.startswith('Hole')])
+    
+    # Line chart for score comparison
     chart_data = CategoryChartData()
-    holes = sorted(hole_stats.keys())
     chart_data.categories = holes
     
-    # Add player scores
     player_scores = [hole_stats[hole]['player_score'] for hole in holes]
     field_averages = [hole_stats[hole]['field_average'] for hole in holes]
+    handicap_averages = [hole_stats[hole].get('handicap_group_avg', 0) for hole in holes]
     
     chart_data.add_series('Player Score', player_scores)
     chart_data.add_series('Field Average', field_averages)
+    chart_data.add_series('Handicap Group', handicap_averages)
     
     x, y, cx, cy = Inches(1), Inches(1.5), Inches(8), Inches(5)
-    chart = slide.shapes.add_chart(
+    chart = slide1.shapes.add_chart(
         XL_CHART_TYPE.LINE_MARKERS, x, y, cx, cy, chart_data
     ).chart
     
     chart.has_legend = True
     chart.has_title = True
+    chart.chart_title.text_frame.text = "Score Comparison by Hole"
+
+    # Create second slide for performance difference
+    slide2 = prs.slides.add_slide(prs.slide_layouts[5])
+    title = slide2.shapes.title
+    title.text = "Hole Performance Analysis"
+    
+    # Calculate differences from average
+    diff_data = CategoryChartData()
+    diff_data.categories = holes
+    
+    # Calculate differences (negative is better in golf)
+    field_differences = [-1 * (ps - fa) for ps, fa in zip(player_scores, field_averages)]
+    handicap_differences = [-1 * (ps - ha) for ps, ha in zip(player_scores, handicap_averages)]
+    
+    diff_data.add_series('vs Field Average', field_differences)
+    diff_data.add_series('vs Handicap Group', handicap_differences)
+    
+    # Add bar chart showing differences
+    chart = slide2.shapes.add_chart(
+        XL_CHART_TYPE.COLUMN_CLUSTERED, x, y, cx, cy, diff_data
+    ).chart
+    
+    chart.has_legend = True
+    chart.has_title = True
+    chart.chart_title.text_frame.text = "Performance vs Averages (Negative is Better)"
 
 def _add_time_analysis_slide(prs, time_stats):
     """Add time of day analysis chart"""

@@ -145,105 +145,127 @@ def get_player_column(df):
     raise ValueError("Could not find player column in the data")
 
 def analyze_player_performance(client, df, selected_player):
-    """Analyze specific player's performance compared to others."""
     try:
-        # Get the correct player column name
-        player_column = 'Player_Name'  # Match your data structure
-        
-        # Verify player exists in the data
-        if selected_player not in df[player_column].values:
-            return f"Error: Player '{selected_player}' not found in the data"
-        
-        # Calculate player stats
+        player_column = 'Player_Name'
         player_data = df[df[player_column] == selected_player]
         
-        # Add hole-by-hole analysis
-        hole_columns = sorted([col for col in df.columns if col.startswith('H_') and col.endswith('_GS')])
-        hole_stats = {}
-        for hole in hole_columns:
-            hole_num = int(hole.split('_')[1])
-            player_score = player_data[hole].mean()
-            field_average = df[hole].mean()
-            hole_stats[f"Hole {hole_num}"] = {
-                'player_score': round(float(player_score), 2),
-                'field_average': round(float(field_average), 2),
-                'difference': round(float(player_score - field_average), 2)
-            }
+        # Get handicap group statistics
+        player_handicap = float(player_data['Handicap'].iloc[0])
+        handicap_group = df[
+            (df['Handicap'] >= player_handicap - 2) & 
+            (df['Handicap'] <= player_handicap + 2)
+        ]
         
-        # Add time of day analysis (modified to handle time strings)
+        # Calculate handicap group stats for each hole
+        handicap_group_stats = {
+            col: handicap_group[col].mean() 
+            for col in df.columns 
+            if col.startswith('H_') and col.endswith('_GS')
+        }
+        
+        # Add time of day analysis
         try:
             df['Hour'] = pd.to_datetime(df['Date'] + ' ' + df['Tee_Off']).dt.hour
             morning_rounds = player_data[df['Hour'] < 12]
             afternoon_rounds = player_data[df['Hour'] >= 12]
             
             time_analysis = {
-                'morning_avg': round(float(morning_rounds['Tot_par'].mean()), 2) if not morning_rounds.empty else 0,
-                'afternoon_avg': round(float(afternoon_rounds['Tot_par'].mean()), 2) if not afternoon_rounds.empty else 0,
-                'morning_rounds': len(morning_rounds),
-                'afternoon_rounds': len(afternoon_rounds)
+                'morning_stats': {
+                    'avg_score': round(float(morning_rounds['Tot_par'].mean()), 2) if not morning_rounds.empty else None,
+                    'rounds_played': len(morning_rounds),
+                    'best_score': round(float(morning_rounds['Tot_par'].min()), 2) if not morning_rounds.empty else None
+                },
+                'afternoon_stats': {
+                    'avg_score': round(float(afternoon_rounds['Tot_par'].mean()), 2) if not afternoon_rounds.empty else None,
+                    'rounds_played': len(afternoon_rounds),
+                    'best_score': round(float(afternoon_rounds['Tot_par'].min()), 2) if not afternoon_rounds.empty else None
+                }
             }
         except Exception as e:
-            # Fallback if time analysis fails
-            time_analysis = {
-                'morning_avg': 0,
-                'afternoon_avg': 0,
-                'morning_rounds': 0,
-                'afternoon_rounds': 0
-            }
-        
-        # Add handicap comparison
-        player_handicap = float(player_data['Handicap'].iloc[0])
-        similar_handicaps = df[
-            (df['Handicap'] >= player_handicap - 2) & 
-            (df['Handicap'] <= player_handicap + 2) & 
-            (df['Player_Name'] != selected_player)
-        ]
-        
-        handicap_analysis = {
-            'player_avg': round(float(player_data['Tot_par'].mean()), 2),
-            'similar_handicap_avg': round(float(similar_handicaps['Tot_par'].mean()), 2),
-            'handicap_range': f"{player_handicap-2} to {player_handicap+2}",
-            'similar_players_count': len(similar_handicaps['Player_Name'].unique())
+            time_analysis = None
+
+        metrics_data = {
+            'holes': {col: {
+                'score': player_data[col].iloc[0],
+                'field_avg': df[col].mean(),
+                'handicap_group_avg': handicap_group_stats.get(col)
+            } for col in df.columns if col.startswith('H_') and col.endswith('_GS')},
+            'handicap': player_handicap,
+            'total_par': float(player_data['Tot_par'].iloc[0]),
+            'handicap_group': {
+                'size': len(handicap_group),
+                'avg_total_par': float(handicap_group['Tot_par'].mean()),
+                'range': f"{player_handicap-2} to {player_handicap+2}",
+                'best_total_par': float(handicap_group['Tot_par'].min()),
+                'worst_total_par': float(handicap_group['Tot_par'].max())
+            },
+            'time_analysis': time_analysis
         }
 
-        # Update analysis prompt
-        analysis_prompt = f"""Analyze the following golf player statistics and provide a detailed comparison:
+        analysis_prompt = f"""You are a professional golf analyst. Analyze this player's performance data:
 
 Player: {selected_player}
 
-Hole-by-Hole Analysis:
-{json.dumps(hole_stats, indent=2)}
+Available Data:
+{json.dumps(metrics_data, indent=2)}
 
-Handicap Comparison:
-{json.dumps(handicap_analysis, indent=2)}
+Provide a detailed analysis following this structure:
+1. Overall Performance Summary:
+   - FORMAT AS: "Total Par: [value]"
+   - FORMAT AS: "Handicap: [value]"
+   - FORMAT AS: "vs Handicap Group Avg: [value]"
 
-Player's Current Statistics:
-- Total Par: {player_data['Tot_par'].iloc[0]}
-- Handicap: {player_handicap}
+2. Time of Day Analysis (IMPORTANT):
+   - FORMAT AS: "Morning Average: [value]"
+   - FORMAT AS: "Afternoon Average: [value]"
+   - FORMAT AS: "Preferred Time: [Morning/Afternoon]"
+   - FORMAT AS: "Time Performance Gap: [value]"
+   - Analyze scoring patterns by time of day
+   - Identify optimal tee time preference
+   - Compare morning vs afternoon consistency
 
-Hole Performance Metrics:
-{"".join(f"Hole {i}: {hole_stats[f'Hole {i}']['player_score']} (Field Avg: {hole_stats[f'Hole {i}']['field_average']})\n" for i in range(1, 19))}
-
-Provide a detailed analysis with the following structure:
-1. Overall Performance Summary
-2. Hole-by-Hole Performance:
-   - List each hole's average score compared to field average
-   - Identify strongest and weakest holes
-   - Highlight notable patterns
 3. Handicap Group Comparison:
-   - Compare performance against similar handicap players
-   - Identify areas where player outperforms or underperforms their handicap group
-4. Key Strengths
-5. Areas for Improvement
-6. Specific Recommendations
+   - FORMAT AS: "Handicap Group Range: [range]"
+   - FORMAT AS: "Group Size: [number] players"
+   - FORMAT AS: "Player vs Group Avg: [difference]"
+   - Analyze performance relative to handicap group
+   - Identify key performance gaps
 
-Format all numerical data as "Metric: Value" for proper chart generation.
-Include specific hole scores and handicap comparisons."""
+4. Hole-by-Hole Analysis:
+   - FORMAT AS: "Hole X: [player score] (Handicap Group Avg: [avg], Field Avg: [avg])"
+   - Show score differences
+   - Identify patterns
+
+5. Key Findings:
+   - FORMAT AS: "Finding: [description]"
+   - Include time of day insights
+   - Compare with handicap group
+   - Highlight strongest periods of play
+
+6. Recommendations:
+   - FORMAT AS: "Recommendation: [action] (Impact: XX%)"
+   - Suggest optimal tee times
+   - Provide specific practice focus areas
+   - Include time-based strategies
+
+Requirements:
+- EMPHASIZE both time of day and handicap analysis
+- All numerical data MUST be formatted as "Metric: Value"
+- Include specific morning vs afternoon comparisons
+- Show percentage differences
+- Provide clear tee time preferences
+
+Focus Areas:
+- Morning vs Afternoon performance
+- Handicap group comparison
+- Time-based scoring patterns
+- Optimal playing conditions
+- Strategic tee time selection"""
 
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a professional golf analyst. Provide detailed insights comparing the player's performance with others."},
+                {"role": "system", "content": "You are a professional golf analyst specializing in statistical analysis and performance improvement recommendations."},
                 {"role": "user", "content": analysis_prompt}
             ],
             temperature=0.7,
