@@ -209,6 +209,8 @@ Player: {selected_player}
 Available Data:
 {json.dumps(metrics_data, indent=2)}
 
+For time analysis, Games with tee time before 10 am are morning games. Rest are noon games. In noon game — since sun is up and since it’s winter time the night dew goes away. This makes a ball roll extra distance.
+
 Provide a detailed analysis following this structure:
 1. Overall Performance Summary:
    - FORMAT AS: "Total Par: [value]"
