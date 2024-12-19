@@ -159,9 +159,12 @@ def analyze_player_performance(client, df, selected_player):
     try:
         analysis_prompt = f"""You are an elite PGA-level golf performance analyst specializing in statistical analysis and player improvement. Analyze this player's detailed performance data:
 
-        {df.to_string()}
+Provided All Data:    
+////START////
+{df.to_string()}
+////END////
 
-Player: {selected_player}
+Selected Player: {selected_player}
 
 Course Conditions Context:
 - Morning Rounds (Before 10 AM): Typically slower greens due to morning dew, cooler temperatures affecting ball flight
