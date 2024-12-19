@@ -157,64 +157,85 @@ def get_player_column(df):
 
 def analyze_player_performance(client, df, selected_player):
     try:
-        analysis_prompt = f"""You are a professional golf analyst. Analyze this player's performance data:
+        analysis_prompt = f"""You are an elite PGA-level golf performance analyst specializing in statistical analysis and player improvement. Analyze this player's detailed performance data:
+
+        {df.to_string()}
 
 Player: {selected_player}
 
-For time analysis, Games with tee time before 10 am are morning games. Rest are noon games. In noon game — since sun is up and since it’s winter time the night dew goes away. This makes a ball roll extra distance.
+Course Conditions Context:
+- Morning Rounds (Before 10 AM): Typically slower greens due to morning dew, cooler temperatures affecting ball flight
+- Afternoon Rounds: Faster green speeds, wind patterns more variable, drier conditions affecting roll distance
+- Winter Conditions: Afternoon sun removes dew effect, potentially increasing roll distance by 10-15%
 
-Provide a detailed analysis following this structure:
-1. Overall Performance Summary:
-   - FORMAT AS: "Total Par: [value]"
-   - FORMAT AS: "Handicap: [value]"
-   - FORMAT AS: "vs Handicap Group Avg: [value]"
+Provide a comprehensive technical analysis following this structure:
 
-2. Time of Day Analysis (IMPORTANT):
-   - FORMAT AS: "Morning Average: [value]"
-   - FORMAT AS: "Afternoon Average: [value]"
-   - FORMAT AS: "Preferred Time: [Morning/Afternoon]"
-   - FORMAT AS: "Time Performance Gap: [value]"
-   - Analyze scoring patterns by time of day
-   - Identify optimal tee time preference
-   - Compare morning vs afternoon consistency
+1. Overall Performance Metrics:
+   - FORMAT AS: "Total Par: [value]" (Include + or - relative to course par)
+   - FORMAT AS: "Handicap Index: [value]" (Include trend direction)
+   - FORMAT AS: "Strokes Gained vs Handicap Group: [value]"
+   - FORMAT AS: "Scoring Average: [value]"
+   - FORMAT AS: "GIR Percentage: [value]%"
 
-3. Handicap Group Comparison:
-   - FORMAT AS: "Handicap Group Range: [range]"
-   - FORMAT AS: "Group Size: [number] players"
-   - FORMAT AS: "Player vs Group Avg: [difference]"
-   - Analyze performance relative to handicap group
-   - Identify key performance gaps
+2. Time of Day Performance Analysis (CRITICAL):
+   - FORMAT AS: "AM Scoring Average: [value]"
+   - FORMAT AS: "PM Scoring Average: [value]"
+   - FORMAT AS: "Optimal Playing Window: [Morning/Afternoon]"
+   - FORMAT AS: "Performance Delta: [value] strokes"
+   - Detailed green speed impact analysis
+   - Wind pattern adaptation metrics
+   - Temperature impact on distance control
 
-4. Hole-by-Hole Analysis:
-   - FORMAT AS: "Hole X: [player score] (Handicap Group Avg: [avg], Field Avg: [avg])"
-   - Show score differences
-   - Identify patterns
+3. Technical Handicap Analysis:
+   - FORMAT AS: "Handicap Peer Group: [range]"
+   - FORMAT AS: "Statistical Peer Group Size: [number] players"
+   - FORMAT AS: "Strokes Gained/Lost vs Peer Group: [value]"
+   - Comparative shot pattern analysis
+   - Scoring distribution on par 3s/4s/5s
+   - Course management efficiency rating
 
-5. Key Findings:
-   - FORMAT AS: "Finding: [description]"
-   - Include time of day insights
-   - Compare with handicap group
-   - Highlight strongest periods of play
+4. Hole-by-Hole Statistical Breakdown:
+   - FORMAT AS: "Hole [X] ([Par]): [player score] (Peer Avg: [avg], Field Avg: [avg])"
+   - Risk/reward decision points
+   - Shot distribution patterns
+   - Critical scoring opportunities
+   - Recovery shot efficiency
 
-6. Recommendations:
-   - FORMAT AS: "Recommendation: [action] (Impact: XX%)"
-   - Suggest optimal tee times
-   - Provide specific practice focus areas
-   - Include time-based strategies
+5. Key Performance Insights:
+   - FORMAT AS: "Strategic Finding: [detailed description]"
+   - Time-based performance variations
+   - Course management decisions
+   - Scoring pattern anomalies
+   - Statistical strengths/weaknesses
+   - Weather impact correlations
 
-Requirements:
-- EMPHASIZE both time of day and handicap analysis
-- All numerical data MUST be formatted as "Metric: Value"
-- Include specific morning vs afternoon comparisons
-- Show percentage differences
-- Provide clear tee time preferences
+6. Professional Development Recommendations:
+   - FORMAT AS: "Technical Recommendation: [specific action] (Projected Impact: XX%)"
+   - Optimal tee time strategy
+   - Shot selection modifications
+   - Practice priority areas
+   - Course management adjustments
+   - Environmental adaptation strategies
 
-Focus Areas:
-- Morning vs Afternoon performance
-- Handicap group comparison
-- Time-based scoring patterns
-- Optimal playing conditions
-- Strategic tee time selection"""
+Technical Analysis Requirements:
+- Emphasize strokes gained/lost metrics
+- Include detailed morning vs afternoon statistical comparisons
+- Analyze scoring patterns relative to playing conditions
+- Evaluate decision-making efficiency
+- Quantify performance under varying conditions
+- Provide specific practice protocols
+
+Key Analysis Points:
+- Shot pattern distribution
+- Scoring efficiency by hole type
+- Time-of-day performance correlation
+- Weather impact assessment
+- Course management decision points
+- Statistical trend analysis
+- Performance optimization opportunities
+- Risk/reward efficiency metrics
+
+Ensure all numerical data follows strict formatting for accurate statistical tracking and trend analysis."""
 
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -223,7 +244,6 @@ Focus Areas:
                 {"role": "user", "content": analysis_prompt}
             ],
             temperature=0.7,
-            max_tokens=2000
         )
 
         return response.choices[0].message.content
