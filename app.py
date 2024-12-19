@@ -110,13 +110,6 @@ def main():
             except Exception as e:
                 st.error(f"Error processing file: {str(e)}")
         
-        # Clear data button
-        if st.session_state.data_df is not None:
-            if st.sidebar.button("Clear Data"):
-                st.session_state.data_df = None
-                st.session_state.players_list = None
-                st.session_state.analysis_result = None
-                st.experimental_rerun()
 
         # Add footer
         st.markdown("---")
