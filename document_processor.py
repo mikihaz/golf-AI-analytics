@@ -199,20 +199,44 @@ Provide a comprehensive technical analysis following this structure:
 
 4. Hole-by-Hole Statistical Breakdown:
    - FORMAT AS: "Hole [X] ([Par]): [player score] (Peer Avg: [avg], Field Avg: [avg])"
+   - FORMAT AS: "Total Pars: [number]"
+   - FORMAT AS: "Double Bogeys or Worse: [number]"
+   - Time of Day Analysis:
+      * FORMAT AS: "Morning Stats - Hole [X]:"
+        - Average Score: [value]
+        - Total Pars: [number]
+        - Double Bogeys or Worse: [number]
+      * FORMAT AS: "Afternoon Stats - Hole [X]:"
+        - Average Score: [value]
+        - Total Pars: [number]
+        - Double Bogeys or Worse: [number]
    - Risk/reward decision points
    - Shot distribution patterns
    - Critical scoring opportunities
    - Recovery shot efficiency
 
-5. Key Performance Insights:
+5. Round-by-Round Performance:
+   - FORMAT AS: "Game [Date] [Time]:"
+     * Gross Score: [value]
+     * Total Pars: [number]
+     * Total Bogeys: [number]
+     * Total Double Bogeys or Worse: [number]
+   - Include morning/afternoon split
+   - Trend analysis
+   - Pattern identification
+
+6. Key Performance Insights:
    - FORMAT AS: "Strategic Finding: [detailed description]"
-   - Time-based performance variations
+   - Time-based performance variations including:
+     * Morning vs Afternoon par conversion rates
+     * Time-specific double bogey patterns
+     * Scoring distribution by time of day
    - Course management decisions
    - Scoring pattern anomalies
    - Statistical strengths/weaknesses
    - Weather impact correlations
 
-6. Professional Development Recommendations:
+7. Professional Development Recommendations:
    - FORMAT AS: "Technical Recommendation: [specific action] (Projected Impact: XX%)"
    - Optimal tee time strategy
    - Shot selection modifications
@@ -238,7 +262,15 @@ Key Analysis Points:
 - Performance optimization opportunities
 - Risk/reward efficiency metrics
 
-Ensure all numerical data follows strict formatting for accurate statistical tracking and trend analysis."""
+Ensure all numerical data follows strict formatting for accurate statistical tracking and trend analysis.
+
+Additional Analysis Requirements:
+- Calculate and highlight total pars for each hole and overall rounds
+- Track double bogey or worse frequency by hole and time of day
+- Compare morning vs afternoon performance for each statistical category
+- Identify patterns in scoring distribution across different rounds
+- Analyze par conversion rates by time of day
+- Track progression of double bogey avoidance"""
 
         response = client.chat.completions.create(
             model="gpt-4o",
