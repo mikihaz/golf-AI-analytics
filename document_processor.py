@@ -156,12 +156,37 @@ def get_player_column(df):
 
 
 def analyze_player_performance(client, df, selected_player):
+    hole_index_data = [
+        {"hole_no": 1, "par": 4, "stroke_index": 11},
+        {"hole_no": 2, "par": 3, "stroke_index": 17},
+        {"hole_no": 3, "par": 4, "stroke_index": 3},
+        {"hole_no": 4, "par": 5, "stroke_index": 13},
+        {"hole_no": 5, "par": 4, "stroke_index": 9},
+        {"hole_no": 6, "par": 4, "stroke_index": 5},
+        {"hole_no": 7, "par": 4, "stroke_index": 1},
+        {"hole_no": 8, "par": 4, "stroke_index": 15},
+        {"hole_no": 9, "par": 4, "stroke_index": 7},
+        {"hole_no": 10, "par": 4, "stroke_index": 2},
+        {"hole_no": 11, "par": 4, "stroke_index": 8},
+        {"hole_no": 12, "par": 4, "stroke_index": 14},
+        {"hole_no": 13, "par": 3, "stroke_index": 16},
+        {"hole_no": 14, "par": 4, "stroke_index": 4},
+        {"hole_no": 15, "par": 5, "stroke_index": 12},
+        {"hole_no": 16, "par": 4, "stroke_index": 18},
+        {"hole_no": 17, "par": 4, "stroke_index": 10},
+        {"hole_no": 18, "par": 4, "stroke_index": 6}
+    ]
     try:
         analysis_prompt = f"""You are an elite PGA-level golf performance analyst specializing in statistical analysis and player improvement. Analyze this player's detailed performance data:
 
-Provided All Data:    
+Provided All Score Data:
 ////START////
 {df.to_string()}
+////END////
+
+Provided Golf index Data:
+////START////
+{json.dumps(hole_index_data)}
 ////END////
 
 Selected Player: {selected_player}
